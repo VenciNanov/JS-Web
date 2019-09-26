@@ -142,11 +142,152 @@ module.exports = (req, res) => {
             res.write('404 Not Found!');
         })
     } else if (pathname.includes('/cats/edit-cat') && req.method === 'POST') {
+        let form = new formidable.IncomingForm();
 
-    } else if (pathname.includes('/cats/find-new-home') && req.method === 'GET') {
+        form.parse(req, (err, fields, files) => {
+            if (err) {
+                res.writeHead(500, {
+                    'Content-Type': 'text/plain'
+                });
 
-    } else if (pathname.includes('/cats/find-new-home') && req.method === 'GET') {
+                res.write(`An error has occured. (${err.code})`);
+                res.end();
 
+                throw err;
+            }
+
+            fs.readFile('../01.CatShelter/data/cats.json', (err, data) => {
+                if (err) {
+                    res.writeHead(500, {
+                        'Content-Type': 'text/plain'
+                    });
+
+                    res.write(`An error has occured. (${err.code})`);
+                    res.end();
+
+                    throw err;
+                }
+
+                if (pathname[pathname.length - 1] !== '/') {
+                    let splitUrl = pathname.split('/');
+                    let catId = Number(splitUrl[splitUrl.length - 1]);
+
+                    let catsDB = JSON.parse(data);
+
+                    let oldCat = catsDB.find(obj => obj.Id === catId);
+                    let oldCatIndex = catsDB.indexOf(oldCat)
+                    
+                    let newCat = {
+                        Id: catId,
+                        name: fields.name,
+                        description:fields.description,
+                        breed: fields.breed,
+                        Image: `${files.upload.size === 0 ? oldCat.Image : files.upload.name}`
+                    };
+                    // { Id: cats.length + 1, ...fields, Image: files.upload.name }
+                    catsDB[oldCatIndex] = newCat;
+
+                    let parsedCatsDB = JSON.stringify(catsDB);
+
+                    ( () => {
+                        let oldPath = files.upload.path;
+                        let newPath = path.normalize(path.join(__dirname, '../content/images/' + files.upload.name));
+            
+                        fs.rename(oldPath, newPath, (err) => {
+                            if (err) {
+                                throw err;
+                            }
+                            console.log('File Uploaded!')
+                        })
+
+                        fs.writeFile('./data/cats.json', parsedCatsDB, () => {
+                            res.writeHead(302, {
+                                'Location': '/'
+                            });
+                            res.end();
+                        });
+                    })();
+                }
+            });
+        });
+
+
+    } else if (pathname.includes('/cats/find-new-home/') && req.method === 'GET') {
+        let filePath = path.normalize(
+            path.join(__dirname, '../views/catShelter.html')
+        );
+
+        let stream = fs.createReadStream(filePath);
+
+        stream.on('data', (data) => {
+            var modifiedData = fillEditTemplate(data, pathname)
+            res.write(modifiedData);
+        });
+
+        stream.on('end', () => {
+            res.end();
+        })
+
+        stream.on('err', () => {
+            console.log(err);
+            res.writeHead(404, {
+                'Content-Type': 'text:plain'
+            });
+            res.write('404 Not Found!');
+        })
+    } else if (pathname.includes('/cats/find-new-home/') && req.method === 'POST') {
+        let form = new formidable.IncomingForm();
+
+        form.parse(req, (err, fields, files) => {
+            if (err) {
+                res.writeHead(500, {
+                    'Content-Type': 'text/plain'
+                });
+
+                res.write(`An error has occured. (${err.code})`);
+                res.end();
+
+                throw err;
+            }
+
+            fs.readFile('../01.CatShelter/data/cats.json', (err, data) => {
+                if (err) {
+                    res.writeHead(500, {
+                        'Content-Type': 'text/plain'
+                    });
+
+                    res.write(`An error has occured. (${err.code})`);
+                    res.end();
+
+                    throw err;
+                }
+
+                if (pathname[pathname.length - 1] !== '/') {
+                    let splitUrl = pathname.split('/');
+                    let catId = Number(splitUrl[splitUrl.length - 1]);
+
+                    let catsDB = JSON.parse(data);
+
+                    let oldCat = catsDB.find(obj => obj.Id === catId);
+                    let oldCatIndex = catsDB.indexOf(oldCat)
+
+
+                    // { Id: cats.length + 1, ...fields, Image: files.upload.name }
+                    catsDB.splice(oldCatIndex, 1);
+
+                    let parsedCatsDB = JSON.stringify(catsDB);
+
+                    (() => {
+                        fs.writeFile('./data/cats.json', parsedCatsDB, () => {
+                            res.writeHead(302, {
+                                'Location': '/'
+                            });
+                            res.end();
+                        });
+                    })();
+                }
+            });
+        });
     } else {
         return true;
     }
@@ -168,7 +309,7 @@ function getIdFromUrl(url) {
 
 function getCatById(id) {
 
-    let cat = cats.filter((cat) =>  cat.Id === +id);
+    let cat = cats.filter((cat) => cat.Id === +id);
 
     return cat;
 }
@@ -177,7 +318,7 @@ function fillEditTemplate(data, pathname) {
     let catId = getIdFromUrl(pathname);
 
     let cat = getCatById(catId)[0];
-  
+
 
     let modifiedData = data.toString().replace('{{id}}', catId);
     modifiedData = modifiedData.replace('{{name}}', cat.name);
@@ -186,6 +327,8 @@ function fillEditTemplate(data, pathname) {
     const breedsAsOptions = breeds.map((b) => `<option value="${b}">${b}</option>`);
     modifiedData = modifiedData.replace('breeds', breedsAsOptions.join('/'));
     modifiedData = modifiedData.replace('{{breed}}', cat.breed);
+    modifiedData = modifiedData.replace('{{imageSrc}}',`/content/images/${cat.Image}`)
+
 
     return modifiedData;
 }

@@ -28,7 +28,6 @@ module.exports = (req, res) => {
 
     if (pathname.startsWith('/content/') && req.method === "GET") {
 
-        console.log(pathname);
         if ((pathname.endsWith('png') || pathname.endsWith('jpg') || pathname.endsWith('jpeg') || pathname.endsWith('ico') )&& req.method === 'GET') {
        
             fs.readFile(`./${pathname}`, (err, data) => {
